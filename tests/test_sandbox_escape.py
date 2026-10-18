@@ -9,7 +9,6 @@ missing, and a failure in CI.
 from __future__ import annotations
 
 import os
-import subprocess
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -59,13 +58,9 @@ def wait_ready(p: SandboxPool, want: int = POOL_SIZE, timeout: float = 30.0) -> 
 
 
 def sandbox_containers() -> list[str]:
-    out = subprocess.run(  # noqa: S603
-        ["docker", "ps", "-a", "-q", "--filter", f"label={LABEL}"],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.split()
+    """Ids of every sandbox container on the daemon (through the SDK, so no docker CLI needed)."""
+    client = docker.from_env()
+    return [c.id for c in client.containers.list(all=True, filters={"label": LABEL})]
 
 
 def run_ok(p: SandboxPool, code: str, rows=None) -> dict:
@@ -152,8 +147,12 @@ def check(rows):
         for bad in ("DATABASE", "REDIS", "DOCKER", "PASSWORD", "SECRET", "TOKEN"):
             if bad in key.upper():
                 leaks.append("env " + key)
-    for path in [{str(host_file)!r}, "/var/run/docker.sock", "/run/docker.sock", "/host", "/mnt"]:
+    for path in [{str(host_file)!r}, "/var/run/docker.sock", "/run/docker.sock"]:
         if os.path.exists(path):
+            leaks.append("sees " + path)
+    for path in ["/host", "/mnt"]:
+        # Debian images ship an empty /mnt; only a mount, or something inside, is a leak.
+        if os.path.exists(path) and (os.path.ismount(path) or os.listdir(path)):
             leaks.append("sees " + path)
     for root in ("/home", "/root", "/proc/1", "/etc/shadow"):
         pass
