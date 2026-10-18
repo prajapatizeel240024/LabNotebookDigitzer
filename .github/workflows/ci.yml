@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  # Unit and integration tests against the fake model server. No GPU, no model download.
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lnd
+          POSTGRES_DB: lnd_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lnd -d lnd_test" --health-interval 2s
+          --health-timeout 2s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["56379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s
+          --health-timeout 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e '.[dev]'
+      # CI=true makes tests that need Postgres or Redis fail instead of skipping.
+      - run: pytest -q -m "not docker" --durations=10
+        env:
+          CI: "true"
+
+  # Needs a Docker daemon: builds the real sandbox image and runs the escape tests and the
+  # egress test against it.
+  sandbox:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e '.[dev]'
+      - run: docker build -f docker/sandbox.Dockerfile -t lnd-sandbox:ci .
+      - run: pytest -q -m docker -rs
+        env:
+          CI: "true"
+          SANDBOX_IMAGE: lnd-sandbox:ci
+      - name: Sandbox start-up benchmark (informational)
+        run: python -m bench.sandbox_bench --runs 20 --burst 8
+        env:
+          SANDBOX_IMAGE: lnd-sandbox:ci
+
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          tags: lnd-app:ci
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build the sandbox image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox.Dockerfile
+          tags: lnd-sandbox:ci
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Compose files are valid
+        run: |
+          export POSTGRES_PASSWORD=ci DOCKER_GID=0
+          docker compose config -q
+          docker compose -f docker-compose.yml -f docker-compose.fake.yml config -q
+          docker compose -f docker-compose.test.yml config -q
+      - name: The built app image starts and answers the health check
+        run: |
+          docker run -d --name smoke --read-only --tmpfs /tmp --cap-drop ALL \
+            -e PORT=8080 lnd-app:ci python -m lnd.fakes.model_server
+          for i in $(seq 1 20); do
+            docker exec smoke python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/health', timeout=2)" && exit 0
+            sleep 1
+          done
+          docker logs smoke
+          exit 1

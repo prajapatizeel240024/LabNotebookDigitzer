@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab Notebook Digitizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Lab Notebook Digitizer</h1>
+    <div class="header-right">
+      <label>Tenant <input id="tenant" size="12" value="default" spellcheck="false"></label>
+      <span id="usage" title="Tokens used by this tenant"></span>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <section>
+        <h2>Upload</h2>
+        <form id="upload-form">
+          <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required>
+          <button type="submit">Upload</button>
+        </form>
+        <p id="upload-msg" class="muted"></p>
+      </section>
+      <section>
+        <h2>Documents</h2>
+        <ul id="docs" class="plain"></ul>
+      </section>
+    </aside>
+
+    <section id="workspace" hidden>
+      <div class="doc-head">
+        <div>
+          <h2 id="doc-title"></h2>
+          <div class="progress"><div id="bar"></div></div>
+          <p id="doc-status" class="muted"></p>
+        </div>
+        <div class="exports">
+          <a id="export-json" href="#">Export JSON</a>
+          <a id="export-csv" href="#">Export CSV</a>
+        </div>
+      </div>
+
+      <div id="page-chips" class="chips"></div>
+
+      <div class="review" id="review" hidden>
+        <div class="pane image-pane">
+          <img id="page-img" alt="Notebook page" title="Click to switch between fit and full size">
+        </div>
+        <div class="pane form-pane">
+          <p id="page-state" class="muted"></p>
+          <div id="record-form" hidden>
+            <label>Title <input id="f-title"></label>
+            <label>Date <input id="f-date" placeholder="YYYY-MM-DD or empty"></label>
+            <label>Narrative <textarea id="f-narrative" rows="6"></textarea></label>
+            <h3>Reagents</h3>
+            <table id="reagents">
+              <thead><tr><th>Name</th><th>Amount</th><th>Unit</th><th>Molar mass (g/mol)</th><th>Equiv.</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button type="button" id="add-row">Add reagent</button>
+            <label>Notes <textarea id="f-notes" rows="3"></textarea></label>
+            <div class="save-row">
+              <input id="f-editor" placeholder="Your name" size="14">
+              <input id="f-note" placeholder="What did you change? (optional)" size="26">
+              <button type="button" id="save" class="primary">Save new version</button>
+            </div>
+            <p id="save-msg" class="muted"></p>
+            <h3>Checks</h3>
+            <div id="checks" class="muted">No checks yet.</div>
+            <h3>History</h3>
+            <ul id="history" class="plain"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,645 @@
+{
+ "description": "Answer key for the 20 synthetic notebook pages. Written by hand; chemistry numbers are internally consistent except on the three pages with expect_check_issue, where one row was made wrong on purpose.",
+ "pages": [
+  {
+   "id": "page01",
+   "title": "Aspirin from salicylic acid",
+   "date": "2025-01-14",
+   "narrative": "Warmed salicylic acid with acetic anhydride and a few drops of phosphoric acid at 75 C for 15 min. Poured into ice water and filtered the white crystals. Yield 82 percent.",
+   "reagents": [
+    {
+     "name": "salicylic acid",
+     "amount": 2.76,
+     "unit": "g",
+     "molar_mass_g_mol": 138.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "acetic anhydride",
+     "amount": 5.1,
+     "unit": "g",
+     "molar_mass_g_mol": 102.09,
+     "equivalents": 2.5
+    },
+    {
+     "name": "phosphoric acid",
+     "amount": 196.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 98.0,
+     "equivalents": 0.1
+    }
+   ],
+   "notes": "mp 134-136 C. Recrystallise from ethanol next time.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page02",
+   "title": "Fischer esterification of benzoic acid",
+   "date": "2025-01-21",
+   "narrative": "Refluxed benzoic acid in dry methanol with sulfuric acid for 4 h. Quenched with sodium bicarbonate and extracted with ether. Clear oil, yield 91 percent.",
+   "reagents": [
+    {
+     "name": "benzoic acid",
+     "amount": 1.22,
+     "unit": "g",
+     "molar_mass_g_mol": 122.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "methanol",
+     "amount": 3.2,
+     "unit": "g",
+     "molar_mass_g_mol": 32.04,
+     "equivalents": 10.0
+    },
+    {
+     "name": "sulfuric acid",
+     "amount": 196.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 98.08,
+     "equivalents": 0.2
+    }
+   ],
+   "notes": "TLC hexane/EtOAc 9:1, Rf 0.55.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page03",
+   "title": "Suzuki coupling to 4-methylbiphenyl",
+   "date": "2025-02-03",
+   "narrative": "Degassed the toluene/water mix for 20 min. Heated at 85 C overnight under nitrogen. Column on silica gave white solid, yield 76 percent.",
+   "reagents": [
+    {
+     "name": "4-bromotoluene",
+     "amount": 855.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 171.04,
+     "equivalents": 1.0
+    },
+    {
+     "name": "phenylboronic acid",
+     "amount": 732.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 121.93,
+     "equivalents": 1.2
+    },
+    {
+     "name": "Pd(PPh3)4",
+     "amount": 173.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 1155.56,
+     "equivalents": 0.03
+    },
+    {
+     "name": "K2CO3",
+     "amount": 1.38,
+     "unit": "g",
+     "molar_mass_g_mol": 138.21,
+     "equivalents": 2.0
+    }
+   ],
+   "notes": "Catalyst was bright yellow, stored in the glovebox.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page04",
+   "title": "Vanillin reduction with NaBH4",
+   "date": "2025-02-11",
+   "narrative": "Dissolved vanillin in ethanol at 0 C and added sodium borohydride in portions. Stirred 1 h at room temperature. Acidified, extracted, evaporated. Yield 88 percent.",
+   "reagents": [
+    {
+     "name": "vanillin",
+     "amount": 1.22,
+     "unit": "g",
+     "molar_mass_g_mol": 152.15,
+     "equivalents": 1.0
+    },
+    {
+     "name": "NaBH4",
+     "amount": 454.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 37.83,
+     "equivalents": 1.5
+    }
+   ],
+   "notes": "Vanillyl alcohol, white needles.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page05",
+   "title": "Amide coupling of benzoic acid and benzylamine",
+   "date": "2025-02-19",
+   "narrative": "Added EDC and HOBt to the acid in DMF at 0 C, then the amine and base. Stirred 16 h. Washed with dilute HCl and brine. Yield 79 percent.",
+   "reagents": [
+    {
+     "name": "benzoic acid",
+     "amount": 488.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 122.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "benzylamine",
+     "amount": 471.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 107.15,
+     "equivalents": 1.1
+    },
+    {
+     "name": "EDC HCl",
+     "amount": 920.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 191.7,
+     "equivalents": 2.4
+    },
+    {
+     "name": "HOBt",
+     "amount": 649.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 135.12,
+     "equivalents": 1.2
+    }
+   ],
+   "notes": "Recheck the EDC weighing, scale looked off.",
+   "expect_check_issue": true,
+   "issue_reagent": "EDC HCl"
+  },
+  {
+   "id": "page06",
+   "title": "Williamson ether synthesis",
+   "date": "2025-03-04",
+   "narrative": "Stirred 4-methoxyphenol with potassium carbonate in acetone for 30 min, added ethyl bromide and refluxed 6 h. Filtered salts, evaporated. Pale oil, yield 85 percent.",
+   "reagents": [
+    {
+     "name": "4-methoxyphenol",
+     "amount": 1.49,
+     "unit": "g",
+     "molar_mass_g_mol": 124.14,
+     "equivalents": 1.0
+    },
+    {
+     "name": "ethyl bromide",
+     "amount": 1.96,
+     "unit": "g",
+     "molar_mass_g_mol": 108.97,
+     "equivalents": 1.5
+    },
+    {
+     "name": "K2CO3",
+     "amount": 3.32,
+     "unit": "g",
+     "molar_mass_g_mol": 138.21,
+     "equivalents": 2.0
+    }
+   ],
+   "notes": "Ethyl bromide is volatile, kept cold.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page07",
+   "title": "Aldol condensation to dibenzalacetone",
+   "date": "2025-03-14",
+   "narrative": "Mixed benzaldehyde and acetone in ethanol, added aqueous NaOH dropwise. Yellow solid appeared within 10 min. Stirred 30 min, filtered and washed with cold water. Yield 94 percent.",
+   "reagents": [
+    {
+     "name": "benzaldehyde",
+     "amount": 1.59,
+     "unit": "g",
+     "molar_mass_g_mol": 106.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "acetone",
+     "amount": 436.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 58.08,
+     "equivalents": 0.5
+    },
+    {
+     "name": "NaOH",
+     "amount": 600.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 40.0,
+     "equivalents": 1.0
+    }
+   ],
+   "notes": "mp 110 C.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page08",
+   "title": "Acetylation of aniline",
+   "date": "2025-03-27",
+   "narrative": "Dissolved aniline in water with HCl, added acetic anhydride then sodium acetate solution. White crystals formed at once. Cooled in ice and filtered. Yield 90 percent.",
+   "reagents": [
+    {
+     "name": "aniline",
+     "amount": 931.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 93.13,
+     "equivalents": 1.0
+    },
+    {
+     "name": "acetic anhydride",
+     "amount": 1.23,
+     "unit": "g",
+     "molar_mass_g_mol": 102.09,
+     "equivalents": 1.2
+    },
+    {
+     "name": "sodium acetate",
+     "amount": 1.23,
+     "unit": "g",
+     "molar_mass_g_mol": 82.03,
+     "equivalents": 1.5
+    }
+   ],
+   "notes": "Acetanilide, mp 114 C.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page09",
+   "title": "Nitration of methyl benzoate",
+   "date": "2025-04-08",
+   "narrative": "Added the nitrating mixture dropwise below 10 C. Stirred 15 min, poured onto ice. Filtered the pale solid and recrystallised from methanol. Yield 71 percent.",
+   "reagents": [
+    {
+     "name": "methyl benzoate",
+     "amount": 1.63,
+     "unit": "g",
+     "molar_mass_g_mol": 136.15,
+     "equivalents": 1.0
+    },
+    {
+     "name": "nitric acid",
+     "amount": 983.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 63.01,
+     "equivalents": 1.3
+    },
+    {
+     "name": "sulfuric acid",
+     "amount": 3.53,
+     "unit": "g",
+     "molar_mass_g_mol": 98.08,
+     "equivalents": 3.0
+    }
+   ],
+   "notes": "Keep below 15 C or the dinitro product forms.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page10",
+   "title": "Wittig reaction to stilbene",
+   "date": "2025-04-17",
+   "narrative": "Made the ylide with potassium tert-butoxide in THF, orange colour. Added benzaldehyde and stirred 3 h. Quenched with water, column. E/Z mixture, yield 67 percent.",
+   "reagents": [
+    {
+     "name": "benzaldehyde",
+     "amount": 637.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 106.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "benzyltriphenylphosphonium chloride",
+     "amount": 2.57,
+     "unit": "g",
+     "molar_mass_g_mol": 388.87,
+     "equivalents": 1.1
+    },
+    {
+     "name": "KOtBu",
+     "amount": 808.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 112.21,
+     "equivalents": 1.2
+    }
+   ],
+   "notes": "NMR shows about 1:3 E to Z.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page11",
+   "title": "Copper click reaction",
+   "date": "2025-05-06",
+   "narrative": "Benzyl azide and phenylacetylene in tBuOH/water. Added copper sulfate and sodium ascorbate, stirred 12 h at room temperature. Filtered the white solid. Yield 93 percent.",
+   "reagents": [
+    {
+     "name": "benzyl azide",
+     "amount": 666.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 133.15,
+     "equivalents": 1.0
+    },
+    {
+     "name": "phenylacetylene",
+     "amount": 511.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 102.13,
+     "equivalents": 1.0
+    },
+    {
+     "name": "CuSO4 5H2O",
+     "amount": 62.4,
+     "unit": "mg",
+     "molar_mass_g_mol": 249.69,
+     "equivalents": 0.05
+    },
+    {
+     "name": "sodium ascorbate",
+     "amount": 991.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 198.11,
+     "equivalents": 0.1
+    }
+   ],
+   "notes": "Ascorbate mass looks wrong, redo the arithmetic.",
+   "expect_check_issue": true,
+   "issue_reagent": "sodium ascorbate"
+  },
+  {
+   "id": "page12",
+   "title": "Boc protection of glycine methyl ester",
+   "date": "2025-05-15",
+   "narrative": "Suspended the amine salt in DCM, added triethylamine then Boc anhydride at 0 C. Warmed to room temperature overnight. Washed with citric acid. Yield 96 percent.",
+   "reagents": [
+    {
+     "name": "glycine methyl ester HCl",
+     "amount": 1.26,
+     "unit": "g",
+     "molar_mass_g_mol": 125.55,
+     "equivalents": 1.0
+    },
+    {
+     "name": "Boc2O",
+     "amount": 2.4,
+     "unit": "g",
+     "molar_mass_g_mol": 218.25,
+     "equivalents": 1.1
+    },
+    {
+     "name": "triethylamine",
+     "amount": 2.23,
+     "unit": "g",
+     "molar_mass_g_mol": 101.19,
+     "equivalents": 2.2
+    }
+   ],
+   "notes": "Colourless oil, solidifies in the freezer.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page13",
+   "title": "Oxidation of benzyl alcohol",
+   "date": null,
+   "narrative": "Stirred benzyl alcohol with TEMPO and the iodine reagent in DCM for 2 h. Quenched with thiosulfate. Aldehyde smell, clean by TLC. Yield 84 percent.",
+   "reagents": [
+    {
+     "name": "benzyl alcohol",
+     "amount": 1.08,
+     "unit": "g",
+     "molar_mass_g_mol": 108.14,
+     "equivalents": 1.0
+    },
+    {
+     "name": "TEMPO",
+     "amount": 78.1,
+     "unit": "mg",
+     "molar_mass_g_mol": 156.25,
+     "equivalents": 0.05
+    },
+    {
+     "name": "PhI(OAc)2",
+     "amount": 3.54,
+     "unit": "g",
+     "molar_mass_g_mol": 322.1,
+     "equivalents": 1.1
+    }
+   ],
+   "notes": "Used it straight away, it oxidises in air.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page14",
+   "title": "Friedel-Crafts acylation of anisole",
+   "date": "2025-06-02",
+   "narrative": "Cooled AlCl3 in DCM, added acetyl chloride, then anisole slowly. Stirred 1 h at 0 C. Poured on ice and HCl. Mostly para product, yield 80 percent.",
+   "reagents": [
+    {
+     "name": "anisole",
+     "amount": 1.62,
+     "unit": "g",
+     "molar_mass_g_mol": 108.14,
+     "equivalents": 1.0
+    },
+    {
+     "name": "acetyl chloride",
+     "amount": 1.41,
+     "unit": "g",
+     "molar_mass_g_mol": 78.5,
+     "equivalents": 1.2
+    },
+    {
+     "name": "AlCl3",
+     "amount": 2.6,
+     "unit": "g",
+     "molar_mass_g_mol": 133.34,
+     "equivalents": 1.3
+    }
+   ],
+   "notes": "Dry glassware, AlCl3 fumes in air.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page15",
+   "title": "Saponification of methyl salicylate",
+   "date": "2025-06-12",
+   "narrative": "Refluxed methyl salicylate with aqueous NaOH for 45 min. Cooled and acidified to pH 2. White precipitate of salicylic acid, filtered and dried. Yield 89 percent.",
+   "reagents": [
+    {
+     "name": "methyl salicylate",
+     "amount": 1.52,
+     "unit": "g",
+     "molar_mass_g_mol": 152.15,
+     "equivalents": 1.0
+    },
+    {
+     "name": "NaOH",
+     "amount": 1.0,
+     "unit": "g",
+     "molar_mass_g_mol": 40.0,
+     "equivalents": 2.5
+    }
+   ],
+   "notes": "Smells of wintergreen until the end.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page16",
+   "title": "Reductive amination of cyclohexanone",
+   "date": "2025-06-25",
+   "narrative": "Mixed ketone and amine in DCE with a drop of acetic acid, stirred 30 min, then added the borohydride. 18 h at room temperature. Basic workup, yield 74 percent.",
+   "reagents": [
+    {
+     "name": "cyclohexanone",
+     "amount": 785.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 98.14,
+     "equivalents": 1.0
+    },
+    {
+     "name": "benzylamine",
+     "amount": 857.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 107.15,
+     "equivalents": 1.0
+    },
+    {
+     "name": "NaBH(OAc)3",
+     "amount": 2.54,
+     "unit": "g",
+     "molar_mass_g_mol": 211.94,
+     "equivalents": 1.5
+    }
+   ],
+   "notes": "Product is a pale yellow oil.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page17",
+   "title": "Sandmeyer bromination",
+   "date": "2025-07-08",
+   "narrative": "Diazotised the aniline with sodium nitrite at 0 C, added to hot copper bromide solution. Gas evolved. Steam distilled the product. Yield 58 percent.",
+   "reagents": [
+    {
+     "name": "4-chloroaniline",
+     "amount": 765.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 127.57,
+     "equivalents": 1.0
+    },
+    {
+     "name": "NaNO2",
+     "amount": 455.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 69.0,
+     "equivalents": 1.1
+    },
+    {
+     "name": "CuBr",
+     "amount": 1.03,
+     "unit": "g",
+     "molar_mass_g_mol": 143.45,
+     "equivalents": 12.0
+    }
+   ],
+   "notes": "Low yield, check the copper bromide amount.",
+   "expect_check_issue": true,
+   "issue_reagent": "CuBr"
+  },
+  {
+   "id": "page18",
+   "title": "Diels-Alder of anthracene",
+   "date": "2025-07-22",
+   "narrative": "Refluxed anthracene and maleic anhydride in xylene for 30 min. Cooled and filtered the crystals. Washed with cold ether. Yield 87 percent.",
+   "reagents": [
+    {
+     "name": "anthracene",
+     "amount": 891.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 178.23,
+     "equivalents": 1.0
+    },
+    {
+     "name": "maleic anhydride",
+     "amount": 588.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 98.06,
+     "equivalents": 1.2
+    }
+   ],
+   "notes": "mp 262 C.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page19",
+   "title": "Steglich esterification",
+   "date": "2025-08-05",
+   "narrative": "Dissolved the acid, ethanol and DMAP in DCM, cooled to 0 C and added DCC. Stirred 12 h. Filtered off the urea. Column, yield 81 percent.",
+   "reagents": [
+    {
+     "name": "4-nitrobenzoic acid",
+     "amount": 1.17,
+     "unit": "g",
+     "molar_mass_g_mol": 167.12,
+     "equivalents": 1.0
+    },
+    {
+     "name": "ethanol",
+     "amount": 484.0,
+     "unit": "mg",
+     "molar_mass_g_mol": 46.07,
+     "equivalents": 1.5
+    },
+    {
+     "name": "DCC",
+     "amount": 1.59,
+     "unit": "g",
+     "molar_mass_g_mol": 206.33,
+     "equivalents": 1.1
+    },
+    {
+     "name": "DMAP",
+     "amount": 85.5,
+     "unit": "mg",
+     "molar_mass_g_mol": 122.17,
+     "equivalents": 0.1
+    }
+   ],
+   "notes": "Urea byproduct is a pain to remove.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  },
+  {
+   "id": "page20",
+   "title": "Bromination of acetanilide",
+   "date": "2025-09-03",
+   "narrative": "Dissolved acetanilide in acetonitrile, added NBS in portions and stirred 4 h in the dark. Poured into water, filtered. Mostly the para isomer, yield 86 percent.",
+   "reagents": [
+    {
+     "name": "acetanilide",
+     "amount": 1.22,
+     "unit": "g",
+     "molar_mass_g_mol": 135.17,
+     "equivalents": 1.0
+    },
+    {
+     "name": "NBS",
+     "amount": 1.68,
+     "unit": "g",
+     "molar_mass_g_mol": 177.98,
+     "equivalents": 1.05
+    }
+   ],
+   "notes": "Wrap the flask in foil.",
+   "expect_check_issue": false,
+   "issue_reagent": null
+  }
+ ]
+}

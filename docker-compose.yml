@@ -1,0 +1,192 @@
+# Lab Notebook Digitizer.
+#
+# Networks
+#   internal  no route to the internet. Everything that touches notebook data lives here:
+#             postgres, redis, the model server, the workers, the sandbox manager and the API.
+#   edge      only the API joins it, so Docker can publish its port. The bridge has IP
+#             masquerading switched off, so nothing on it can reach the internet either.
+#   download  an ordinary bridge with internet, used only by the one-off `models-fetch`
+#             container (`make models`). Nothing else is ever attached to it.
+# Sandbox containers are created by the sandbox manager with no network at all.
+#
+# Only the API publishes a port, and only on 127.0.0.1.
+# Only the sandbox manager mounts the Docker socket.
+
+name: lnd
+
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+x-app: &app
+  <<: *hardened
+  image: lnd-app:latest
+  build:
+    context: .
+    dockerfile: docker/app.Dockerfile
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://lnd:${POSTGRES_PASSWORD:?run make env first}@postgres:5432/lnd
+  REDIS_URL: redis://redis:6379/0
+  MODEL_BASE_URL: http://model-server:8080
+  MODEL_NAME: ${MODEL_NAME:-qwen2.5-vl-7b-instruct-q4_k_m}
+  SANDBOX_URL: http://sandbox-manager:8090
+  DATA_DIR: /data
+  DEFAULT_TOKEN_BUDGET: ${DEFAULT_TOKEN_BUDGET:-}
+
+networks:
+  internal:
+    internal: true
+  edge:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  download:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  data:
+  models:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lnd
+      POSTGRES_DB: lnd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run make env first}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lnd -d lnd"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # llama.cpp's server with a Qwen2.5-VL GGUF. Weights come from the `models` volume, which
+  # `make models` fills once. This service has no internet, so it cannot download anything.
+  model-server:
+    # Pinned by digest to the build the README numbers were measured with (llama-server
+    # b11718-547208dca, pulled 2026-10-18; the digest covers linux/amd64 and linux/arm64).
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:4b7be0376002b4450a357a109bab804093ff9251193cc75ed4ce0cb39953ff5c
+    restart: unless-stopped
+    command:
+      - -m
+      - /models/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
+      - --mmproj
+      - /models/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
+      - --alias
+      - ${MODEL_NAME:-qwen2.5-vl-7b-instruct-q4_k_m}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -c
+      - "8192"
+      - -np
+      - "1"
+    volumes:
+      - models:/models:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+  api:
+    <<: *app
+    command: ["uvicorn", "lnd.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment: *app-env
+    ports:
+      # Host port: 8000 unless API_PORT is set (`API_PORT=8001 make up` if 8000 is taken).
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - data:/data
+    networks: [internal, edge]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Scale with: docker compose up -d --scale worker=N
+  worker:
+    <<: *app
+    command: ["python", "-m", "lnd.worker"]
+    environment: *app-env
+    volumes:
+      - data:/data
+    networks: [internal]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  # The one service with the Docker socket. It gets no database or queue credentials, and
+  # it only offers "run this code on these rows" over HTTP.
+  sandbox-manager:
+    <<: *app
+    command: ["python", "-m", "lnd.sandbox.manager"]
+    environment:
+      BIND_HOST: 0.0.0.0
+      PORT: "8090"
+      SANDBOX_IMAGE: lnd-sandbox:latest
+      SANDBOX_POOL_SIZE: ${SANDBOX_POOL_SIZE:-4}
+      SANDBOX_TIMEOUT_S: ${SANDBOX_TIMEOUT_S:-5}
+      SANDBOX_RUNTIME: ${SANDBOX_RUNTIME:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:?run make env first}"
+    networks: [internal]
+    depends_on:
+      sandbox-image: {condition: service_completed_successfully}
+
+  # Builds the sandbox image on the host's Docker, then exits. The manager starts containers
+  # from it. (No network, nothing to run.)
+  sandbox-image:
+    image: lnd-sandbox:latest
+    build:
+      context: .
+      dockerfile: docker/sandbox.Dockerfile
+    command: ["python3", "-c", "pass"]
+    network_mode: none
+    restart: "no"
+
+  # One-off: `make models`. The only container that is allowed onto the internet.
+  models-fetch:
+    <<: *app
+    restart: "no"
+    profiles: [models]
+    command: ["python", "-m", "lnd.fetch_models", "/models"]
+    volumes:
+      - models:/models
+    networks: [download]
+    read_only: false

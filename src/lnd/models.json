@@ -1,0 +1,24 @@
+{
+  "name": "Qwen2.5-VL-7B-Instruct, Q4_K_M",
+  "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+  "revision": "508edd0afaa66bb9e9f40587acc2184f02daf1f6",
+  "base_model": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "license": "Apache-2.0",
+  "source_url": "https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+  "checked": "2026-10-18",
+  "files": [
+    {
+      "name": "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+      "role": "language model weights",
+      "size": 4683072032,
+      "sha256": "9258bf05b12686d097ff3b6b18d968ab393649780aa2b3cd67fec43d50554392"
+    },
+    {
+      "name": "mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
+      "role": "vision projector (mmproj)",
+      "size": 853119712,
+      "sha256": "2ddb555391bae966e412deab9e07b58afa18bcc06930ba0f1c78a3695ab9e506"
+    }
+  ],
+  "note": "Pinned on 2026-10-18 from the files 'make models' downloaded: size in bytes and sha256, hashed again after the download. Files are fetched from this exact repo revision, and 'make models' refuses a file whose size or sha256 differs. To move to a newer upload, change revision, size and sha256 together."
+}

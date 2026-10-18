@@ -1,0 +1,31 @@
+# Throwaway Postgres and Redis for the integration tests (`make test-deps`).
+# Published on 127.0.0.1 only, on unusual ports so they do not clash with your own.
+# Trust auth is fine here: the database holds nothing but test data and is not reachable
+# from outside this machine.
+name: lnd-test
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lnd
+      POSTGRES_DB: lnd_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lnd -d lnd_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

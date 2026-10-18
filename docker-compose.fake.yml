@@ -1,0 +1,30 @@
+# Swaps the real model server for the fake one (instant canned answers, no GPU, no download).
+# Used for the load test and for trying the stack without a model:
+#   docker compose -f docker-compose.yml -f docker-compose.fake.yml up -d
+# Needs Docker Compose 2.24 or newer for the !reset tag.
+services:
+  model-server:
+    image: lnd-app:latest
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    command: ["python", "-m", "lnd.fakes.model_server"]
+    environment:
+      BIND_HOST: 0.0.0.0
+      PORT: "8080"
+      FAKE_LATENCY_MS: ${FAKE_LATENCY_MS:-0}
+    volumes: !reset []
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    user: "10001:10001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 0s

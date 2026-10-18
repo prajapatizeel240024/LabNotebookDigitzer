@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lab-notebook-digitizer"
+version = "0.1.0"
+description = "Self-hosted service that turns photographed lab-notebook pages and scanned PDFs into structured, reviewable records."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic>=2.8",
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+    "redis>=5.0",
+    "httpx>=0.27",
+    "pymupdf>=1.24",
+    "pillow>=10.4",
+    "python-multipart>=0.0.9",
+    "docker>=7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lnd = ["schema.sql", "models.json", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "docker: needs a Docker daemon and the sandbox image (set SANDBOX_IMAGE)",
+    "integration: needs Postgres and Redis (see docker-compose.test.yml)",
+    "slow: takes more than a few seconds",
+]
+addopts = "-ra"
+filterwarnings = [
+    # The Docker SDK leaves a half-read exec stream behind when a container is killed on purpose.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::DeprecationWarning:starlette.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "bench", "evaluation"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = [
+    "S101",  # assert is fine in tests
+    "S311",  # random is used for jitter and synthetic data, not for security
+    "B008",  # FastAPI Depends/File defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "B017"]
+"bench/*" = ["S"]
+"evaluation/*" = ["S"]
+"src/lnd/fakes/*" = ["S"]

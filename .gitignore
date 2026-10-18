@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+data/
+dist/
+build/
+evaluation/results/
+# model weights: `make models` keeps them in a Docker volume; a local fetch writes ./models
+*.gguf
+*.gguf.part
+/models/
