@@ -105,6 +105,15 @@ def llm_json_schema() -> dict[str, Any]:
     $refs are inlined and cosmetic keys are dropped. Pydantic still does the real
     validation afterwards, so anything the grammar cannot express (like the date
     pattern) is still enforced.
+
+    Every key is required (a value can still be null), so the grammar makes the model write
+    all of them in page order: title, date, narrative, reagents, notes. With only title and
+    narrative required, the real model wrote title, narrative, reagents, notes and left the
+    date out on every page, even one dated 2025-02-03.
     """
     raw = PageExtraction.model_json_schema()
-    return _inline_refs(raw, raw.get("$defs", {}))
+    schema = _inline_refs(raw, raw.get("$defs", {}))
+    schema["required"] = list(schema["properties"])
+    item = schema["properties"]["reagents"]["items"]
+    item["required"] = list(item["properties"])
+    return schema

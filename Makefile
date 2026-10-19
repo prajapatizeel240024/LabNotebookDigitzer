@@ -4,9 +4,12 @@ FAKE         := -f docker-compose.yml -f docker-compose.fake.yml
 N            ?= 2
 PAGES        ?= 300
 WORKER_SETS  ?= 1 2 4 8
-PY           ?= python3
+# The project's virtualenv if there is one (python3.12 -m venv .venv), else python3.
+PY           ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 # Host port of the API. docker compose reads it too: API_PORT=8001 make up if 8000 is taken.
 API_PORT     ?= 8000
+# Total time `make eval` gives the 20 pages. A CPU model takes about 2-4 minutes a page.
+EVAL_TIMEOUT ?= 7200
 
 .PHONY: help env build models up up-fake down logs scale test-deps test-deps-down install test \
         test-docker lint fmt loadtest sandbox-bench eval-pages eval clean
@@ -57,7 +60,7 @@ test-deps-down:  ## stop them
 test:  ## fast tests (needs `make test-deps`; Docker-based tests are skipped)
 	$(PY) -m pytest -q -m "not docker"
 
-test-docker:  ## sandbox escape tests (need a Docker daemon and the sandbox image)
+test-docker: env  ## sandbox escape tests (need a Docker daemon and the sandbox image)
 	$(COMPOSE) build sandbox-image
 	SANDBOX_IMAGE=lnd-sandbox:latest $(PY) -m pytest -q -m docker
 
@@ -84,7 +87,7 @@ eval-pages:  ## render the 20 synthetic notebook pages
 	$(PY) -m evaluation.render_pages
 
 eval:  ## score extraction accuracy through the API (stack must be up with a model)
-	$(PY) -m evaluation.run_eval --api http://127.0.0.1:$(API_PORT)
+	$(PY) -m evaluation.run_eval --api http://127.0.0.1:$(API_PORT) --timeout $(EVAL_TIMEOUT)
 
 clean:  ## remove caches and build output
 	rm -rf .pytest_cache .ruff_cache build dist *.egg-info src/*.egg-info

@@ -81,6 +81,15 @@ def test_llm_schema_is_flat_and_serialisable():
     }
 
 
+def test_llm_schema_requires_every_key_in_page_order():
+    # Optional keys let the model skip them: with only title and narrative required it never
+    # wrote the date. Values can still be null; the keys must be there.
+    schema = llm_json_schema()
+    assert schema["required"] == ["title", "date", "narrative", "reagents", "notes"]
+    item = schema["properties"]["reagents"]["items"]
+    assert item["required"] == ["name", "amount", "unit", "molar_mass_g_mol", "equivalents"]
+
+
 def test_parse_accepts_fenced_json():
     fenced = "```json\n" + json.dumps(GOOD) + "\n```"
     assert parse_extraction(fenced).title == "Aldol condensation"

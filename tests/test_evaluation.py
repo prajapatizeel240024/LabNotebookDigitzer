@@ -199,6 +199,12 @@ def test_oracle_model_scores_100_percent_end_to_end(clean, oracle_model, api):
     assert "100.0%" in run_eval.table(res)
 
 
+def test_pages_not_finished_in_time_are_scored_as_failed_not_lost(clean, api):
+    res = run_eval.run(api, "eval-timeout", EVAL / "pages", timeout=0)  # no worker runs
+    assert len(res["unfinished_pages"]) == 20 and res["failed_pages"] == res["unfinished_pages"]
+    assert res["summary"]["accuracy"] == 0.0 and res["summary"]["pages"] == 20
+
+
 def test_damaged_model_scores_lower(clean, oracle_model, api):
     import httpx
 

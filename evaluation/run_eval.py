@@ -5,6 +5,8 @@
 Each page is uploaded as its own one-page document under a fresh tenant, so nothing mixes with
 other data. Results go to evaluation/results/latest.json and a table is printed. The model's
 token use comes from the usage endpoint, so the numbers match what the gateway recorded.
+Pages still unfinished at the timeout are scored as failed and listed, and the exit code is 1,
+so a slow model costs those pages rather than the whole run.
 """
 
 from __future__ import annotations
@@ -55,15 +57,16 @@ def run(client: Any, tenant: str, pages_dir: Path, timeout: float) -> dict[str, 
                 del pending[pid]
         if pending:
             time.sleep(1.0)
-    if pending:
-        raise SystemExit(f"{len(pending)} pages did not finish in {timeout:.0f}s")
+    unfinished = sorted(pending)
     elapsed = time.time() - t0
 
     per_page: dict[str, dict[str, bool]] = {}
     checks: dict[str, dict[str, Any] | None] = {}
     failed: list[str] = []
     for page in truth:
-        rec = client.get(f"/api/pages/{page_ids[page['id']]}/record", headers=headers).json()
+        rec: dict[str, Any] = {"record": None, "checks": None}  # not finished in time
+        if page["id"] in page_ids:
+            rec = client.get(f"/api/pages/{page_ids[page['id']]}/record", headers=headers).json()
         data = rec["record"]["data"] if rec["record"] else None
         if data is None:
             failed.append(page["id"])
@@ -74,6 +77,7 @@ def run(client: Any, tenant: str, pages_dir: Path, timeout: float) -> dict[str, 
         "tenant": tenant,
         "seconds": round(elapsed, 1),
         "failed_pages": failed,
+        "unfinished_pages": unfinished,
         "summary": summarise(per_page),
         "checks": check_report(truth, checks),
         "per_page": {k: {f: v for f, v in d.items() if not v} for k, d in per_page.items()},
@@ -117,6 +121,11 @@ def main() -> None:
     args.out.write_text(json.dumps(res, indent=2))
     print(table(res))
     print(f"\n{res['seconds']} s for {res['summary']['pages']} pages; wrote {args.out}")
+    if res["unfinished_pages"]:
+        sys.exit(
+            f"{len(res['unfinished_pages'])} pages did not finish in {args.timeout:.0f}s and were "
+            f"scored as failed: {', '.join(res['unfinished_pages'])}"
+        )
 
 
 if __name__ == "__main__":

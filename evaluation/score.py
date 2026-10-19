@@ -48,7 +48,10 @@ def same_number(a: Any, b: Any) -> bool:
 
 def score_page(truth: dict[str, Any], pred: dict[str, Any] | None) -> dict[str, bool]:
     """Returns {field_name: correct}. A missing prediction gets every field wrong."""
-    pred = pred or {}
+    if pred is None:  # a failed page earns nothing, even where the truth is empty (page13's date)
+        names = [*TOP_FIELDS]
+        names += [f"reagent.{f}#{i}" for i in range(len(truth["reagents"])) for f in REAGENT_FIELDS]
+        return dict.fromkeys(names, False)
     out: dict[str, bool] = {
         "title": same_text(truth["title"], pred.get("title")),
         "date": (truth["date"] or None) == (pred.get("date") or None),

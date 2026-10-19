@@ -1,7 +1,9 @@
 # Design notes
 
-What was decided, why, what it costs, and what would change in production. Where a number is
-quoted it was measured on a 2 vCPU VM (see the README).
+What was decided, why, what it costs, and what would change in production. Every number names
+the machine it was measured on; the README's Results section describes the machines. How the
+system works end to end is in [docs/architecture.md](docs/architecture.md), and how it would be
+deployed for real labs is in [docs/production.md](docs/production.md).
 
 ## 1. The shape of the system
 
@@ -10,8 +12,10 @@ Pages are the unit of work: a 300-page PDF becomes 300 small jobs, so it spreads
 workers as you start, and one bad page fails alone.
 
 Postgres is the source of truth (documents, pages, versions, events, token usage). Redis only
-holds "what to do next". If Redis lost everything, `POST /api/documents/{id}/requeue` puts the
-unfinished pages back.
+holds "what to do next". If Redis lost everything, `POST /api/documents/{id}/requeue` puts back
+every page still marked `queued` (that includes pages waiting out a retry). A page that a worker
+was processing at that moment still finishes if the worker lives; if the worker died too, the
+page stays `processing` and nothing puts it back yet.
 
 ## 2. The queue
 
@@ -23,11 +27,13 @@ is four structures changed by Lua scripts (each script is atomic):
 - `delayed` sorted set: jobs waiting out a retry back-off.
 - `dead` list: jobs that failed 3 times.
 
-A worker pops a job and gets a lease (10 minutes by default). It acks when done. If it crashes,
-a reaper (every worker runs one, once a second) finds the expired lease and puts the job back,
-and that counts as an attempt. Retry delay is `2s * 2^(n-1)` with 20 percent jitter, capped at
-60 s. After the third failure the job goes to `dead` and the page is marked failed, with the
-error visible in the review screen; `POST /api/pages/{id}/retry` revives it.
+A worker pops a job and gets a lease (10 minutes by default in the code; the compose file sets 60
+minutes, because a CPU model can spend minutes on each of a job's up to three calls). It acks when
+done. If it crashes, a reaper (every worker runs one between jobs, at most once a second) finds the
+expired lease and puts the job back, and that counts as an attempt. The retry delay is
+`2 s * 2^(n-1)`, capped at 60 s, then multiplied by a random 0.8 to 1.2, so with three attempts the
+two waits are about 2 s and 4 s. After the third failure the job goes to `dead` and the page is
+marked failed, with the error visible in the review screen; `POST /api/pages/{id}/retry` revives it.
 
 All times come from Redis `TIME`, not from worker clocks, so skewed clocks cannot expire a lease
 early.
@@ -91,14 +97,17 @@ pool.
 a container talk to its neighbours: the database, Redis, the model server. Code that is only
 asked to do arithmetic needs none of that, so it gets no network at all.
 
-**Warm pool.** Starting a container costs about 160 ms on the test VM (cold acquire p50 157 ms,
-p95 184 ms). The manager keeps a few already-started idle containers, so a request takes one in
-about 0.01 ms. Whole-run times were 237 ms warm vs 433 ms cold at p50. The remaining 237 ms is
-mostly `docker exec` starting a fresh Python process; a runner that is already running and
-pre-imported in the warm container would cut most of it. Not done: it needs a protocol between
-manager and container, and a long-running process inside is more state to reason about.
-A burst larger than the pool spills to cold starts rather than queueing (4 warm and 8 cold in
-the 12-request test).
+**Warm pool.** Starting a container is the slow part: a cold acquire took 157 ms at p50 on the VM,
+83 ms on CI's runner and 93 ms on the Mac (the README has p95s). The manager keeps a few
+already-started idle containers, so a request takes one in about 0.01 ms on all three. A whole
+check run took 237 ms warm against 433 ms cold at p50 on the VM, 64 against 157 ms on CI and 38
+against 127 ms on the Mac. Most of a warm run is the `docker exec` that starts a fresh Python
+process (not measured on its own); a runner that is already running and pre-imported in the warm
+container would cut most of it. Not done: it needs a protocol between manager and container, and
+a long-running process inside is more state to reason about. In the benchmark, which lets every
+request of a burst run at once, a burst bigger than the pool spills to cold starts (4 warm and 8
+cold out of 12 on the VM and on the Mac). The stack itself runs 4 checks at a time
+(`SANDBOX_MAX_CONCURRENT`), so there extra requests wait up to 15 s for a slot instead.
 
 **Why the manager is also a risk.** Starting sibling containers needs the Docker API, and
 access to the Docker socket is the same as root on the host: whoever can talk to it can start a
@@ -112,7 +121,8 @@ the most valuable target in the system. What is done about it:
   cannot choose the image, the network, mounts or limits; those are fixed in the manager.
 - The sandbox image is fixed, has no pip and no secrets.
 - The manager runs read-only, non-root, with capabilities dropped. (Reaching the socket needs the
-  docker group id, passed with `group_add`.)
+  docker group id, passed with `group_add`. On Docker Desktop the socket inside containers is
+  `root:root` with mode 660, so that group is 0, root's group.)
 
 What this does *not* fix: a bug in the manager that lets a caller control container creation is
 still a host compromise, and a kernel escape from the sandbox container is a host compromise.
@@ -136,14 +146,19 @@ Three Docker networks:
 - `internal` is created with `internal: true`: Docker adds no route to the outside. Postgres,
   Redis, the model server, workers, the sandbox manager and the API all sit on it.
 - `edge` exists only so Docker can publish the API's port. It has IP masquerading switched off,
-  so even something attached to it cannot reach the internet. Only the API joins it, and the port
+  so on a Linux host even something attached to it cannot reach the internet (tested in CI). On
+  Docker Desktop for Mac that does not hold: a container on such a bridge reached `1.1.1.1`, so
+  there the API, the one container on `edge`, is not cut off. Only the API joins it, and the port
   is published on `127.0.0.1`.
 - `download` is a normal bridge used only by `make models`, a one-off container.
 
 The model server does not need the internet because the weights are in a volume. A test builds an
-`internal` network and shows a container on it cannot connect to public IPs or resolve names, and
-that a neighbour on the same network is still reachable (so the failure means "no route", not
-"broken network").
+`internal` network and shows a container on it cannot connect to `1.1.1.1`, `8.8.8.8` or
+`example.com` (by name), and that a neighbour on the same network is still reachable (so the
+failure means "no route", not "broken network"). Another builds a bridge with masquerading off,
+like `edge`, and shows it cannot reach `1.1.1.1` while an ordinary bridge can. That holds on
+Linux (CI). On Docker Desktop for Mac the `internal` tests pass, but the masquerade-off bridge
+does reach `1.1.1.1`, so the test records an expected failure there.
 
 Another test reads the compose file and fails if anything other than the API publishes a port,
 if anything but `models-fetch` is on the download network, if `docker.sock` appears anywhere but
@@ -162,6 +177,14 @@ the manager, or if a password is written into the file.
 - **PDF size.** Pages are rendered one at a time inside the worker at 150 dpi and capped at 2000
   px on the long side. The API only counts pages at upload, so a 300-page PDF is not rendered in
   the web process.
+- **CPU speed sets the limits.** On CPU one page takes minutes (see the README), so the compose
+  file gives each model call 15 minutes (`MODEL_TIMEOUT_S`) and a job a 60-minute lease
+  (`LEASE_S`); workers start only once the model server reports healthy, so pages taken during
+  model load cannot burn their attempts in seconds; and llama.cpp's in-RAM prompt cache is off
+  (`--cache-ram 0`): every page brings a new image, so cached prompts were not reused, and the
+  default 8 GiB cache grew the model server by about 0.2 GiB a page (7.9 to 8.8 GiB over five
+  pages on the Mac, in a 14.7 GB VM), on course to run out of memory within a 20-page run. With
+  `-np 1` the server answers one request at a time, so more workers do not help on CPU.
 - **A check can lie about itself.** The model writes the check and reports its verdict; a wrong
   or fooled check can say "all fine". So a check result is a hint shown next to the fields, not a
   gate, and the stored code is shown to the reviewer. Edits re-run the stored code, not a new
@@ -184,10 +207,17 @@ the manager, or if a password is written into the file.
 
 ## 9. What the measurements do and do not show
 
-- The load test shows the queue and workers scale: 1.98x at 2 workers and 7.14x at 8 when the
-  model takes 250 ms. With an instant model the 2 CPUs are the limit and the curve flattens at
-  about 1.5k pages/min. That flat part says something about this VM, not about the design.
-- No real model accuracy number exists in this repo yet. The harness has been checked only with a
-  fake that returns the true answer, so it shows the scorer and the plumbing are right.
-- The sandbox numbers come from a local Python image, plain `runc`, on a VM that is already
-  virtualised. A different host, or gVisor, will give different times.
+- The load test shows the queue and workers scale when the model is the wait: with a fake model
+  that takes 250 ms, 1.98x at 2 workers and 7.14x at 8 on the VM, 2.01x and 7.58x on the Mac.
+  With an instant model the CPUs are the limit and the curve flattens (about 1.5k pages/min on
+  the VM's 2 CPUs, 9.4k on the Mac's 8). That flat part says something about the machine, not
+  the design. None of it applies to the real model on CPU, which answers one request at a time.
+- Real-model accuracy (Mac, 20 synthetic pages): 100% of 400 fields, after the date fix. The pages
+  are synthetic (one handwriting font, one layout), so real notebooks will score lower; the one
+  real photo tried got a valid record but has no answer key. The oracle run (100% on any machine)
+  checks the scorer and the plumbing, not a model.
+- The model-written checks caught all 3 planted problems but raised false alarms on 16 of 17
+  clean pages, which is why a check is a hint and not a gate.
+- The sandbox numbers come from plain `runc` on machines that are themselves virtualised (the VM,
+  CI's runner, Docker Desktop's VM on the Mac), now on the real `python:3.12-slim` image. A
+  bare-metal host, or gVisor, will give different times.

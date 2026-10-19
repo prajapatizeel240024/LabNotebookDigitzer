@@ -4,7 +4,9 @@
 #   internal  no route to the internet. Everything that touches notebook data lives here:
 #             postgres, redis, the model server, the workers, the sandbox manager and the API.
 #   edge      only the API joins it, so Docker can publish its port. The bridge has IP
-#             masquerading switched off, so nothing on it can reach the internet either.
+#             masquerading switched off, so on a Linux host nothing on it can reach the internet
+#             either. On Docker Desktop (macOS) it can: its VM still carries that traffic
+#             (measured, tests/test_egress.py), so there the API is not cut off.
 #   download  an ordinary bridge with internet, used only by the one-off `models-fetch`
 #             container (`make models`). Nothing else is ever attached to it.
 # Sandbox containers are created by the sandbox manager with no network at all.
@@ -39,6 +41,10 @@ x-app-env: &app-env
   SANDBOX_URL: http://sandbox-manager:8090
   DATA_DIR: /data
   DEFAULT_TOKEN_BUDGET: ${DEFAULT_TOKEN_BUDGET:-}
+  # One model call can take minutes on CPU (timings in the README). A job makes up to three
+  # calls, so its lease must outlast three timeouts.
+  MODEL_TIMEOUT_S: ${MODEL_TIMEOUT_S:-900}
+  LEASE_S: ${LEASE_S:-3600}
 
 networks:
   internal:
@@ -108,6 +114,10 @@ services:
       - "8192"
       - -np
       - "1"
+      # No prompt cache in RAM: every page has a different image, so cached prompts are never
+      # reused, and the default 8 GiB cache only grows the container towards the VM's limit.
+      - --cache-ram
+      - "0"
     volumes:
       - models:/models:ro
     networks: [internal]
@@ -148,6 +158,8 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
+      # Pages taken while the model is still loading would fail all their attempts in seconds.
+      model-server: {condition: service_healthy}
 
   # The one service with the Docker socket. It gets no database or queue credentials, and
   # it only offers "run this code on these rows" over HTTP.

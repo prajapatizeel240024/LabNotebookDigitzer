@@ -14,6 +14,7 @@ let currentDoc = null;
 let currentPageId = null;
 let currentPageStatus = null; // status of the selected page when its record was last loaded
 let events = null;
+let lastEventId = 0; // id of the last progress event seen for the current document
 let refreshTimer = null;
 
 function withTenant(path) {
@@ -118,21 +119,26 @@ function scheduleRefresh() {
 // ---- progress stream -----------------------------------------------------------------------
 // EventSource reconnects by itself and sends Last-Event-ID, so after a dropped connection or an
 // API restart the server replays exactly the events we have not seen.
-function connectEvents(id) {
+// `after` resumes a stream we closed ourselves (after a retry), without replaying old events.
+function connectEvents(id, after = 0) {
   if (events) events.close();
-  events = new EventSource(withTenant(`/api/documents/${id}/events`));
+  lastEventId = after;
+  const path = `/api/documents/${id}/events` + (after ? `?after=${after}` : "");
+  events = new EventSource(withTenant(path));
   const names = ["document_created", "page_done", "page_failed", "page_requeued", "document_done"];
   for (const name of names) {
-    events.addEventListener(name, () => {
+    events.addEventListener(name, (e) => {
+      if (e.lastEventId) lastEventId = Number(e.lastEventId);
       scheduleRefresh();
       if (name === "document_done") {
-        events.close();
+        e.target.close();
         refreshDocs().catch(() => {});
       }
     });
   }
   events.onerror = () => {
-    $("doc-status").textContent += " (reconnecting...)";
+    const status = $("doc-status");
+    if (!status.textContent.endsWith(" (reconnecting...)")) status.textContent += " (reconnecting...)";
   };
 }
 
@@ -148,7 +154,9 @@ async function selectPage(id) {
 }
 
 async function loadRecord() {
-  const r = await api(`/api/pages/${currentPageId}/record`);
+  const pageId = currentPageId;
+  const r = await api(`/api/pages/${pageId}/record`);
+  if (pageId !== currentPageId) return; // another page was selected while this one loaded
   currentPageStatus = r.page.status;
   const state = $("page-state");
   $("save-msg").textContent = "";
@@ -160,6 +168,7 @@ async function loadRecord() {
       const btn = el("button", { type: "button", text: "Retry page" });
       btn.addEventListener("click", async () => {
         await api(`/api/pages/${currentPageId}/retry`, { method: "POST" });
+        connectEvents(currentDoc, lastEventId);
         scheduleRefresh();
         loadRecord();
       });
@@ -277,7 +286,9 @@ function renderChecks(checks) {
 }
 
 async function loadHistory() {
-  const versions = await api(`/api/pages/${currentPageId}/versions`);
+  const pageId = currentPageId;
+  const versions = await api(`/api/pages/${pageId}/versions`);
+  if (pageId !== currentPageId) return;
   const ul = $("history");
   ul.replaceChildren();
   for (const v of versions) {

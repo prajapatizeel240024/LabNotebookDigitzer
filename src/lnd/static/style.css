@@ -10,6 +10,8 @@
   --bad: #b3261e;
 }
 * { box-sizing: border-box; }
+/* The hidden attribute must win over display rules such as `.review { display: grid }`. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
