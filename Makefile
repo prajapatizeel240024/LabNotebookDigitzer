@@ -6,7 +6,8 @@ PAGES        ?= 300
 WORKER_SETS  ?= 1 2 4 8
 # The project's virtualenv if there is one (python3.12 -m venv .venv), else python3.
 PY           ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
-# Host port of the API. docker compose reads it too: API_PORT=8001 make up if 8000 is taken.
+# Host port of the API; docker compose reads it too. Set it in the environment
+# (API_PORT=8001 make up if 8000 is taken), not in .env: make does not read .env.
 API_PORT     ?= 8000
 # Total time `make eval` gives the 20 pages. A CPU model takes about 2-4 minutes a page.
 EVAL_TIMEOUT ?= 7200
@@ -65,14 +66,14 @@ test-docker: env  ## sandbox escape tests (need a Docker daemon and the sandbox 
 	SANDBOX_IMAGE=lnd-sandbox:latest $(PY) -m pytest -q -m docker
 
 lint:  ## ruff
-	ruff check .
-	ruff format --check .
+	$(PY) -m ruff check .
+	$(PY) -m ruff format --check .
 
 fmt:  ## format
-	ruff check --fix .
-	ruff format .
+	$(PY) -m ruff check --fix .
+	$(PY) -m ruff format .
 
-loadtest:  ## pages/min for 1,2,4,8 workers against the compose stack with the fake model
+loadtest: env  ## pages/min for 1,2,4,8 workers against the compose stack with the fake model
 	$(COMPOSE) $(FAKE) up -d --build
 	@for n in $(WORKER_SETS); do \
 	  $(COMPOSE) $(FAKE) up -d --no-recreate --scale worker=$$n worker; \

@@ -5,7 +5,7 @@ import pytest
 from lnd.db import connection
 from lnd.gateway import BudgetExceeded, LLMGateway, ModelError, usage_summary
 
-from .conftest import make_png
+from .conftest import free_port, make_png
 
 SRC = Path(__file__).resolve().parent.parent / "src" / "lnd"
 
@@ -98,6 +98,15 @@ def test_raising_the_budget_lets_calls_through_again(clean, model, api):
         ask(gw)
     api.put("/api/tenants/acme/budget", json={"token_budget": None})
     ask(gw)
+
+
+def test_model_ready_follows_the_health_check(model):
+    import httpx
+
+    assert LLMGateway(base_url=model.url).model_ready()
+    loading = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    assert not LLMGateway(base_url="http://model", client=loading).model_ready()
+    assert not LLMGateway(base_url=f"http://127.0.0.1:{free_port()}").model_ready()
 
 
 def test_model_failure_is_recorded_and_costs_no_tokens(clean, model):

@@ -2,8 +2,9 @@
 
 Turn photos of lab-notebook pages, and long scanned PDFs, into structured records that a person
 can check and fix. It runs on your own machine. The vision model runs locally, the containers
-that touch your data have no internet, and any code the model writes runs only inside a
-locked-down sandbox.
+that touch your data have no internet on a Linux host (on Docker Desktop for Mac the API container
+can reach it, see Known limits), and any code the model writes runs only inside a locked-down
+sandbox.
 
 ```
  browser ──► 127.0.0.1:8000
@@ -25,7 +26,8 @@ locked-down sandbox.
                                                                      │ sandbox × pool  │
   All of this is on an internal Docker network with no route out.    │ no network,     │
   The API also joins an edge network only so its port can be         │ read-only root  │
-  published on 127.0.0.1 (host port API_PORT, default 8000).         │                 │
+  published on 127.0.0.1 (host port API_PORT, default 8000); edge    │                 │
+  has no way out on Linux, but does on Docker Desktop for Mac.       │                 │
                                                                      └─────────────────┘
 ```
 
@@ -103,7 +105,7 @@ Every number below names the machine it was measured on:
 | Name | Machine | Software |
 |---|---|---|
 | **VM** | small cloud VM: 2 vCPUs, 8 GB RAM, no GPU. The original build machine. It could not pull Docker images, so nothing that needs the stack ran there. | Python 3.13, Docker 29.8 |
-| **Mac** | MacBook Air, Apple M5 (4 performance and 6 efficiency cores), 32 GB RAM, fanless | macOS 26.6.2; Docker Desktop 29.8.2 running a Linux VM with 8 vCPUs and 14.7 GB; no GPU inside containers, so llama.cpp b11718 runs on the CPU; app, sandbox and test images on `python:3.12-slim` (Python 3.12.15, Debian 13) |
+| **Mac** | MacBook Air, Apple M5 (4 performance and 6 efficiency cores), 32 GB RAM, fanless | macOS 26.6.2; Docker Desktop 4.95 (Engine 29.8.2) running a Linux VM with 8 vCPUs and 14.7 GB; no GPU inside containers, so llama.cpp b11718 runs on the CPU; app, sandbox and test images on `python:3.12-slim` (Python 3.12.15, Debian 13) |
 | **CI** | GitHub Actions `ubuntu-24.04` runner, 4 vCPUs, x86-64 | Python 3.12.15; `.github/workflows/ci.yml` |
 
 About the Mac: it ran on battery for part of the work and other apps were open. A fanless laptop
@@ -117,12 +119,12 @@ numbers are given.
 | Extraction accuracy, real model, 20 synthetic pages (`make eval`) | not measured | 100.0% of 400 fields; 20 of 20 pages fully correct (table below) | not run |
 | One page, real model on CPU | not measured | 131.5 s on a cool machine; 181 s after a few minutes of load | not run |
 | A real camera photo of a notebook page | not run | a valid record; the extract call took 216 s | not run |
-| A 10-page scanned PDF | not run | 10 of 10 pages came back as valid records from the real model | not run |
-| Review screen in a real browser | syntax check only | headless Chromium: every step passes after three fixes (below), plus a fourth found by reading the code | not run |
+| A 10-page PDF (eval pages 1-10 placed on letter-size pages, like a scan; not a real scan) | not run | 10 of 10 pages came back as valid records from the real model | not run |
+| Review screen in a real browser | syntax check only | headless Chromium: every step passes on the final code; three bugs were found this way and fixed, more by reading the code (below) | not run |
 | Oracle run: a fake model that returns the answer key (tests the scorer and the plumbing, not a model) | 100.0% of 400 fields | 100.0% | 100.0% |
-| Full test suite | not stated | 135 passed, 1 skipped, 1 expected failure, on `python:3.12-slim` with the real sandbox image (the skip: a pixel-reproduction test that passes on x86-64 but not on arm64; the expected failure: next row but one) | all pass: the fast tests and the 21 Docker tests |
+| Full test suite | not stated | 138 passed, 1 skipped, 1 expected failure, on `python:3.12-slim` with the real sandbox image (the skip: a pixel-reproduction test that passes on x86-64 but not on arm64; the expected failure: next row but one) | all pass: the fast tests and the 21 Docker tests |
 | Sandbox tests (15) | 15 of 15, on a local Python 3.13 image | 15 of 15, on the real `python:3.12-slim` sandbox image | 15 of 15, on the real image |
-| Egress tests (6) | passed | 5 of 6. The sixth fails as expected on Docker Desktop: a bridge with masquerading off, like `edge`, still reached the internet there, so on a Mac the API container is not cut off from the internet. The containers that touch data are on `internal`, which did block it | 6 of 6 |
+| Egress tests (6) | the 4 checks of the `internal` network passed (the original README does not mention the other 2) | 5 of 6. The sixth fails as expected on Docker Desktop: a bridge with masquerading off, like `edge`, still reached the internet there, so on a Mac the API container is not cut off from the internet. The other containers that touch data are on `internal` only, which did block it | 6 of 6 |
 | Warm sandbox: acquire p50 / p95; whole check p50 / p95 | 0.01 / 0.04 ms; 237 / 282 ms | 0.01 / 0.02 ms; 38 / 44 ms | 0.01 / 0.02 ms; 64 / 71 ms |
 | Cold sandbox: acquire p50 / p95; whole check p50 / p95 | 157 / 184 ms; 433 / 495 ms | 93 / 106 ms; 127 / 144 ms | 83 / 90 ms; 157 / 183 ms |
 | Burst against a pool of 4, in the benchmark (which lets every request of the burst run at once; the stack allows 4 at a time) | 12 requests: 4 warm, 8 cold, 2.5 s | 12 requests: 4 warm, 8 cold, 0.41 s | 8 requests: 4 warm, 4 cold, 0.53 s |
@@ -132,11 +134,14 @@ numbers are given.
 
 `make eval` on the Mac: 20 synthetic pages, Qwen2.5-VL-7B Q4_K_M on CPU, one page at a time.
 The run was interrupted when Docker Desktop was quit at page 11; after a restart the other pages
-finished from the queue, and all 20 were scored with the same code (`evaluation/score.py`). Right
+finished from the queue, and all 20 were scored with the same functions `run_eval.py` uses
+(`score_page`, `summarise`, `check_report` from `evaluation/score.py`), from a one-off script that
+is not in the repo; `make eval` itself now survives an API restart (below). Right
 after that restart, 16 model calls got a 503 because Docker's restart policy brought the worker
 back while the model was still loading (compose's start order only applies to `make up`); the
-queue retried them and no page failed, but one page was on its last attempt. The pages are
-synthetic (one handwriting font, one layout, light blur and noise), so treat this as an
+queue retried them and no page failed, but 8 pages each finished on their third and last
+attempt, because the model came up about 4 s after the worker (the worker now waits for it; see
+"What was fixed"). The pages are synthetic (one handwriting font, one layout, light blur and noise), so treat this as an
 upper bound: real notebooks will score lower. The one real photo tried has no answer key.
 
 | Field | Cells | Accuracy |
@@ -170,7 +175,7 @@ why a check is shown as a hint next to the fields, not used as a gate (DESIGN.md
 | page01 (1100 x 1500), cool machine | 2,292 | 99.8 s | 30.7 s | 131.5 s |
 | page01 again, after minutes of full load | 2,292 | 135.9 s | 44.7 s | 181.1 s |
 | real photo, 5184 x 3456 downscaled to 2000 x 1333 | 3,594 | 216.4 s | no reagent table | 216 s of model time |
-| 20 eval pages, back to back | 2,292 each | median 143 s (100-250 s) | median 40 s | median 181 s (134-321 s) |
+| 20 eval pages, one after another (with the interruption above) | 2,292 each | median 143 s (100-250 s) | median 40 s | median 181 s (134-321 s), as the sum of the two calls |
 
 On a cool machine llama.cpp read the prompt at 28.5 tokens/s and generated at 14.6 tokens/s; after
 a few minutes of full load the fanless Air settled at about 20 and 9. So on this Mac a page takes
@@ -184,8 +189,8 @@ tenant, upload a page, see the page image load, wait for the model, see the fiel
 themselves, edit the title and a reagent amount, save (version 2, with editor and note), see the
 history (v2 and v1), load v1 back into the form, export JSON and CSV (both carry version 2 and the
 edits), open a 10-page PDF and pick a page, fail a page on purpose (token budget 0), retry it and
-see it finish by itself. All steps pass, with no errors in the browser console. The screenshot is
-`docs/review-screen.png`.
+see it finish by itself. All steps pass on the final code, with no errors in the browser console.
+The screenshot, `docs/review-screen.png`, is the model's record before any edit.
 
 ### Pages per minute by worker count
 
@@ -230,7 +235,7 @@ and the line is nearly straight up to 8 workers on both machines.
 
 It flattens at about 750 pages/min from 2 workers on. Here every page also runs its check in a real
 sandbox container, and the manager runs 4 at a time while it replaces each used container, so the
-sandbox, not the queue, sets the ceiling once the model is fast.
+sandbox is the likely ceiling once the model is fast (not measured on its own).
 
 ### Sandbox tests
 
@@ -254,10 +259,10 @@ as in CI; on the Mac the tests ran inside a container.
 | `make models` failed: `PermissionError` writing `/models` (the new volume was owned by root; the downloader runs as uid 10001) | the app image creates `/models` owned by the app user, like `/data` | `make models` then downloaded and verified both files |
 | `make models` kept using a stale image after a Dockerfile change | it rebuilds the image first (`run --build`) | the same run |
 | `make up` could not start the API: port 8000 was taken on the Mac | host port is `API_PORT` (default 8000) | the stack ran on `API_PORT=8001` |
-| Model files and server image were not pinned | `models.json` pins the Hugging Face revision, exact sizes and SHA-256, and the fetcher refuses anything else; the llama.cpp image is pinned by digest | hashes recomputed from the downloaded files; tests |
+| Model files and server image were not pinned | `models.json` pins the Hugging Face revision, exact sizes and SHA-256, and the fetcher refuses anything else; the llama.cpp image is pinned by digest | hashes recomputed from the downloaded files; `make models` run again on the pinned revision passed both files; tests |
 | **Dates were never extracted**: the schema sent to llama.cpp required only title and narrative, and the model skipped the optional `date` key on every page, even one dated 2025-02-03 | every key is required in the schema sent to the model (values can still be null), so it writes them in page order | the same request with both schemas, on the real model; then the eval above |
 | The scorer gave a missing page credit where the truth is empty (page13 has no date) | a missing page now scores every field wrong, as documented | new test |
-| llama.cpp's in-RAM prompt cache grew the model server about 0.2 GiB a page | `--cache-ram 0` | anonymous memory stayed at 6.3-6.6 GiB over the 20-page eval |
+| llama.cpp kept every page's prompt in an in-RAM cache (8 GiB by default) though no page reuses another's; with it on, the model server's memory in `docker stats` rose from 7.9 to 8.8 GiB over five pages | `--cache-ram 0` | afterwards anonymous memory read 6.3 to 6.6 GiB at five points over about 30 pages |
 | Workers started before the model had loaded; pages taken then fail all attempts in seconds | workers wait for the model server's health check | start order in `make up` |
 | One model call can take minutes on CPU | compose sets `MODEL_TIMEOUT_S=900` and `LEASE_S=3600` (overridable in `.env`) | container environment |
 | `make eval` gave 20 CPU pages 3600 s and threw away every result on a timeout | `EVAL_TIMEOUT` (default 7200 s); unfinished pages are scored as failed and listed | new test |
@@ -269,6 +274,12 @@ as in CI; on the Mac the tests ran inside a container.
 | The escape tests needed the docker CLI | they use the Docker SDK | the `python:3.12-slim` run |
 | `make test-docker` failed without `.env` | it runs `make env` first | |
 | GPU compose override that nothing here could test | removed | |
+| After Docker Desktop restarted, its restart policy brought the worker back before the model had loaded: 16 calls got a 503, and 8 pages finished on their third and last attempt | the worker waits for the model server's health check before its first job | restarted the model server and worker together: the worker logged that it was waiting; new test |
+| `make eval` stopped the whole run at the first API error (that is how the eval run above was cut short) | it keeps polling until its deadline | code review; test suite |
+| Review screen: replaying the event log from the start closed the stream at a `document_done` from before a retry; a history button could load a version into another page's form | close the stream only when the document is finished; history buttons are tied to their page | code review; the final browser runs above passed with it |
+| The egress tests could not read container output on Docker Desktop (its default log driver is `local`) | read the logs explicitly | `python:3.12-slim` run on the Mac |
+| `make lint` called a bare `ruff` that is only in the venv | `$(PY) -m ruff` | `make lint` |
+| No tests covered the new compose settings | tests for the digest pin, no prompt cache, the worker's start order, and a lease longer than three model calls | test suite |
 
 ### Not verified
 
@@ -317,8 +328,8 @@ must match after normalising case, spacing and punctuation; narrative and notes 
 character similarity; numbers must be within 1 percent; reagent rows are compared in the order
 written. `facts.json` and `pages/` are generated together by `render_pages.py` (re-rendering
 replaces the pages) and the tests check them against each other, so the harness cannot score
-real pages yet: that needs a separate answer key and page directory, which `run_eval.py` does
-not take today.
+real pages yet: `run_eval.py` takes another page directory (`--pages`), but the answer key is
+always `evaluation/facts.json`.
 
 ## Known limits
 
@@ -330,18 +341,16 @@ not take today.
 - Edits have no conflict check: two people saving the same page at once both get a new version,
   and the later one is current.
 - On Docker Desktop for Mac the API container can reach the internet: there, a bridge with
-  masquerading off (`edge`) is not sealed (measured). On a Linux host it is (CI). The containers
-  that touch data are on `internal` and blocked on both.
-- After a Docker or host restart, Docker's restart policy can bring workers back before the model
-  has loaded; their first calls get a 503 and use up attempts (seen once here: no page was lost,
-  one was on its last attempt). A worker that waits for the model's health check before its first
-  job would fix it.
+  masquerading off (`edge`) is not sealed (measured with a bridge built like `edge`). On a Linux
+  host it is (CI). The other containers that touch data are on `internal` only and are blocked on
+  both.
 - Stopping or recreating a worker in the middle of a page (`make down`, or `make up` after a
   rebuild) kills it after Docker's 10 s grace period, since a page takes minutes on CPU. Its job
   then waits out the lease (60 minutes in compose) before another worker takes it, as one used
   attempt. Stop the stack when the queue is empty (`GET /api/queue`).
 - The model server container runs as the llama.cpp image's default user (root) with a writable
-  root file system; the other containers that touch data are read-only and non-root.
+  root file system. Postgres and Redis run as their images ship them (not read-only either); the
+  app containers (API, workers, sandbox manager) are read-only and non-root.
 
 See [DESIGN.md](DESIGN.md) for the decisions, [docs/architecture.md](docs/architecture.md) for
 how the system works, and [docs/production.md](docs/production.md) for running it for real.

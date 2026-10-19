@@ -140,7 +140,10 @@ Notes:
   (root) with a writable root file system; the README lists this as a known limit.
 - Start order (`depends_on`): the API waits for healthy Postgres and Redis. Workers also wait for
   a healthy model server; its healthcheck calls `/health` every 10 s and allows 60 failures after
-  a 60 s start period, which covers loading the weights. The sandbox manager waits for
+  a 60 s start period, which covers loading the weights. That order only applies when compose
+  starts the stack; after a Docker or host restart the restart policy brings every container back
+  at once, so `Worker.run` also waits for `LLMGateway.model_ready()` (the model server's
+  `/health` answering 200) before it takes a job. The sandbox manager waits for
   `sandbox-image` to finish. Nothing waits for the sandbox manager: until it is up, checks come
   back as errors and pages are still saved.
 - The API and every worker run `db.init_schema()` when they start (section 5).
@@ -466,7 +469,9 @@ ids 1..N arrive exactly once. The cost is one short pair of queries per open str
 proxies do not buffer it.
 
 **The browser.** `EventSource` reconnects on its own and sends `Last-Event-ID`. It also reconnects
-after a stream ends normally, so `static/app.js` closes the stream itself on `document_done`.
+after a stream ends normally, so `static/app.js` closes the stream itself on `document_done`,
+but only after checking that the document is still finished: replaying the log from the start
+also replays a `document_done` from before a retry.
 After a manual retry it opens a new stream with `?after=<last id seen>`, because a new
 `EventSource` does not carry the old `Last-Event-ID`.
 
@@ -797,7 +802,7 @@ the default is `default`, and a name is 1 to 64 letters, digits, `_`, `.` or `-`
 | opens the screen | `GET /api/documents`, `GET /api/tenants/{t}/usage` |
 | uploads a file | `POST /api/documents` (multipart), then opens the new document |
 | opens a document | `GET /api/documents/{id}` for the progress bar and page chips; an `EventSource` on `/api/documents/{id}/events?tenant=`; the export links become `/api/documents/{id}/export.json?tenant=` and `.../export.csv?tenant=`; a one-page document opens its page at once |
-| (a progress event arrives) | 300 ms later, `GET /api/documents/{id}` and the usage again; on `document_done` the stream is closed and the list refreshed; if the open page changed status, its record is reloaded, and its image too if it had not loaded yet |
+| (a progress event arrives) | 300 ms later, `GET /api/documents/{id}` and the usage again; on `document_done` the stream is closed if the document is still finished, and the list refreshed; if the open page changed status, its record is reloaded, and its image too if it had not loaded yet |
 | opens a page | the image element loads `/api/pages/{pid}/image?tenant=`; `GET /api/pages/{pid}/record`; then, if there is a record, `GET /api/pages/{pid}/versions` |
 | retries a failed page | `POST /api/pages/{pid}/retry`, then a new stream with `?after=<last id>` |
 | loads an old version | `GET /api/pages/{pid}/versions/{v}` fills the form; saving makes it current as a new version |
@@ -897,7 +902,7 @@ The fake model server also reads `FAKE_ERROR_RATE`, `FAKE_ORACLE_DIR`, `BIND_HOS
 |---|---|---|
 | A worker crashes mid-job | Its job stays in `inflight` until the lease ends (3600 s in compose). Then any worker's reaper puts it back on `ready` with one attempt counted, or on `dead` (page `failed`) if it was the last attempt. Committed work is kept. A crash after the commit but before the ack leads to a rerun that is skipped. | `queue.py` (`_REAP`), `worker.Worker._reap`, `pipeline.finalize_dead`, `pipeline.process_job` |
 | A worker is stopped (SIGTERM) | It stops taking new jobs and finishes the current one if it can. Compose sets no `stop_grace_period`, so Docker sends SIGKILL after 10 s. With the real model a job takes minutes, so a worker that holds a job when `docker compose stop` or `down` runs, or when `make up` recreates it after a rebuild, is usually killed mid-job. Its job stays in `inflight` until the lease ends (3600 s in compose) and then counts as one failed attempt. | `worker.main`, `Worker.stop`, `docker-compose.yml` |
-| The model server is down or restarting | The call fails at once (`ModelError`, an `llm_calls` row with status `error`). The attempt fails and is retried after about 2 s and about 4 s; after three attempts the page is `failed`. So a model server that restarts under running workers can fail pages within seconds; retry them by hand. At stack start, compose holds the workers back until the model server is healthy. | `gateway.LLMGateway.chat`, `pipeline.process_job`, `JobQueue.fail`, `docker-compose.yml` |
+| The model server is down or restarting | The call fails at once (`ModelError`, an `llm_calls` row with status `error`). The attempt fails and is retried after about 2 s and about 4 s; after three attempts the page is `failed`. So a model server that restarts under running workers can fail pages within seconds; retry them by hand. At start, a worker takes no job until the model server is healthy: compose orders the start, and `Worker.run` checks `/health` itself, which also covers Docker restarting every container at once (on the Mac, before that check existed, 16 calls got a 503 and 8 pages finished on their last attempt). | `gateway.LLMGateway.chat`, `pipeline.process_job`, `JobQueue.fail`, `docker-compose.yml` |
 | The model server is slow | A call that passes `MODEL_TIMEOUT_S` fails the same way. With `-np 1`, calls from several workers queue inside llama-server and the waiting counts. If a whole job outlives `LEASE_S`, the reaper gives it to another worker while the first is still busy: both call the model, the first to finish writes the record, and the second finish changes nothing. | the same, plus `store.finalize_page_done` |
 | The model returns invalid output | One retry call with the error. A second invalid answer fails the attempt (`ExtractionError`), and the queue retries the page, up to three attempts. | `extraction.extract_page` |
 | Check code is unusable, crashes, loops or floods output | The page is saved anyway. The check result has status `error`, with the sandbox status (`timeout`, `output_limit`) when there is one. The review screen shows "Check did not run" and the reason. | `checks.run_checks`, `checks.run_code`, `sandbox/manager.py` |
@@ -932,11 +937,11 @@ Known gaps in the current code:
 | Pipeline end to end: a photo; a PDF (one job per page, rendered in the worker, gap-free ids); a duplicate job and a double finish change nothing; retry then success; dead after three failures; manual retry; invalid JSON once; a spent budget fails pages without retries; the sandbox down keeps the extraction; check issues are stored; 8 workers produce one `document_done`; a vanished worker's job is recovered | `tests/test_pipeline.py` | Postgres, Redis, the fake model in-process, `StubSandbox` |
 | API: health; upload validation, including a password-protected PDF; PDF pages counted, not rendered; 404s; tenant isolation, also through `?tenant=`; edits create versions and keep history; edit validation (422) and 409; edits re-run the stored check; JSON and CSV export with formula defusing; EXIF rotation; PNG stored byte for byte; queue endpoint; UI served | `tests/test_api.py` | Postgres, Redis, the fake model in-process for the tests that finish pages |
 | SSE: full replay, then the end; `Last-Event-ID`; `?after=`; a bad id; another tenant gets 404; the API killed with SIGKILL mid-job, ids 1..N arrive exactly once | `tests/test_sse.py` | Postgres, Redis, the fake model; the restart test spawns the API, two workers and the fake model server, and runs the sandbox stub in a thread |
-| Gateway: the metering row; the usage endpoint; usage per tenant; a refusal without a model call; raising the budget; model errors cost no tokens; only the gateway knows the endpoint | `tests/test_gateway.py` | Postgres, Redis (the `clean` fixture checks and flushes it), the fake model |
+| Gateway: the metering row; the usage endpoint; usage per tenant; a refusal without a model call; raising the budget; model errors cost no tokens; readiness follows the model server's health check; only the gateway knows the endpoint | `tests/test_gateway.py` | Postgres, Redis (the `clean` fixture checks and flushes it), the fake model |
 | Extraction: one call when valid, one retry when not, never two retries | `tests/test_extraction.py` | Postgres, Redis (the `clean` fixture checks and flushes it), the fake model |
 | Output schema: extra keys, dates, nulls, ranges, the flattened LLM schema with every key required in page order, fenced and truncated JSON | `tests/test_schemas.py` | nothing |
 | Module rules: only the manager imports the Docker SDK; API and worker modules never import docker or subprocess; no `exec(` or `eval(` outside `sandbox/runner.py` and `sandbox/manager.py`; the manager imports no database or queue code; no hard-coded secrets | `tests/test_architecture.py` | nothing |
-| Compose layout: only the API publishes, on loopback; network membership; `internal` and the no-NAT `edge`; the socket only in the manager; the manager has no credentials or data volume; nothing privileged or on the host network; app containers hardened; no passwords in compose files; `docker compose config` accepts the files | `tests/test_compose.py` | nothing (the Docker CLI for the last check) |
+| Compose layout: only the API publishes, on loopback; network membership; `internal` and the no-NAT `edge`; the socket only in the manager; the manager has no credentials or data volume; nothing privileged or on the host network; app containers hardened; no passwords in compose files; the model server pinned by digest with no prompt cache; workers wait for it; a lease longer than three model calls; `docker compose config` accepts the files | `tests/test_compose.py` | nothing (the Docker CLI for the last check) |
 | Model download: verify, skip, resume, reject a bad hash; the manifest pins revision, sizes and hashes | `tests/test_fetch_models.py` | nothing |
 | Accuracy harness: the answer key, the planted errors, reproducible page renders, scoring rules, an oracle run scores 100 percent, unfinished pages count as failed, damaged answers score lower | `tests/test_evaluation.py` | Postgres, Redis and the oracle fake model in-process for the end-to-end parts |
 | Sandbox escapes, 15 tests: network, writes outside `/tmp`, the small `/tmp`, secrets and host files, fork bomb, endless loop, endless output, one giant print, memory bomb, bad code, the container's flags, non-root without capabilities, single use, warm pool, parallel runs, the narrow HTTP API | `tests/test_sandbox_escape.py` | Docker and the sandbox image (`docker` marker) |

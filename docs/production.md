@@ -501,8 +501,9 @@ flowchart LR
 
 - `model-server` runs llama.cpp's `llama-server` b11718 on CPU, pinned by image digest in
   `docker-compose.yml`. Flags: `-c 8192`, `-np 1`, `--cache-ram 0`. The health check calls
-  `/health` with a 60 s start period and 60 retries. Workers start only after it is healthy
-  (`depends_on: condition: service_healthy`).
+  `/health` with a 60 s start period and 60 retries. Compose starts workers only after it is
+  healthy (`depends_on: condition: service_healthy`), and each worker also waits for `/health`
+  itself before its first job, since a Docker restart brings every container back at once.
   [DESIGN.md §7](../DESIGN.md#7-reading-pages-with-a-small-model) explains `--cache-ram 0`, the
   timeouts and the health gate, and what `-np 1` means for workers; 3.4 covers `-c 8192`.
 - Every model call goes through `src/lnd/gateway.py`. Each page makes up to three calls:

@@ -16,3 +16,5 @@ evaluation/results/
 *.gguf
 *.gguf.part
 /models/
+.DS_Store
+*.log

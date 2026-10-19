@@ -114,8 +114,8 @@ services:
       - "8192"
       - -np
       - "1"
-      # No prompt cache in RAM: every page has a different image, so cached prompts are never
-      # reused, and the default 8 GiB cache only grows the container towards the VM's limit.
+      # No prompt cache in RAM: every page has a different image, so a cached prompt is not
+      # reused by the next page, and the cache (8 GiB by default) only takes memory.
       - --cache-ram
       - "0"
     volumes:
@@ -159,6 +159,8 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       # Pages taken while the model is still loading would fail all their attempts in seconds.
+      # This only orders `docker compose up`; after a Docker restart the worker waits for the
+      # model itself (Worker.run).
       model-server: {condition: service_healthy}
 
   # The one service with the Docker socket. It gets no database or queue credentials, and

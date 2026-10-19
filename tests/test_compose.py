@@ -105,6 +105,24 @@ def test_app_containers_are_hardened(compose):
         assert compose["services"][name]["read_only"] is True, name
 
 
+def test_model_server_is_pinned_and_keeps_no_prompt_cache(compose):
+    svc = compose["services"]["model-server"]
+    assert "@sha256:" in svc["image"]
+    cmd = svc["command"]
+    assert cmd[cmd.index("--cache-ram") + 1] == "0"
+
+
+def test_workers_wait_for_the_model_and_leases_outlast_three_model_calls(compose):
+    worker = compose["services"]["worker"]
+    assert worker["depends_on"]["model-server"] == {"condition": "service_healthy"}
+    env = worker["environment"]
+
+    def default(value: str) -> int:  # "${LEASE_S:-3600}" -> 3600
+        return int(value.split(":-")[1].rstrip("}"))
+
+    assert default(env["LEASE_S"]) > 3 * default(env["MODEL_TIMEOUT_S"])
+
+
 def test_no_password_is_written_into_the_compose_files():
     for name in ("docker-compose.yml", "docker-compose.fake.yml", "docker-compose.test.yml"):
         text = (ROOT / name).read_text()

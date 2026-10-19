@@ -131,7 +131,12 @@ function connectEvents(id, after = 0) {
       if (e.lastEventId) lastEventId = Number(e.lastEventId);
       scheduleRefresh();
       if (name === "document_done") {
-        e.target.close();
+        // Close only if the document is still finished: replaying the log from the start also
+        // replays a document_done from before a retry, after which the document is open again.
+        const source = e.target;
+        api(`/api/documents/${id}`)
+          .then((d) => { if (d.status === "completed") source.close(); })
+          .catch(() => {});
         refreshDocs().catch(() => {});
       }
     });
@@ -296,7 +301,9 @@ async function loadHistory() {
     const who = v.source === "model" ? "model" : v.editor || "reviewer";
     const load = el("button", { type: "button", text: "Load into form" });
     load.addEventListener("click", async () => {
-      const full = await api(`/api/pages/${currentPageId}/versions/${v.version}`);
+      if (pageId !== currentPageId) return; // this list belongs to a page no longer on screen
+      const full = await api(`/api/pages/${pageId}/versions/${v.version}`);
+      if (pageId !== currentPageId) return;
       renderForm(full.data);
       $("save-msg").textContent =
         `Loaded version ${v.version} into the form. Save to make it the current version.`;

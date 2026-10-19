@@ -51,7 +51,13 @@ def run(client: Any, tenant: str, pages_dir: Path, timeout: float) -> dict[str, 
     page_ids: dict[str, str] = {}
     while pending and time.time() < deadline:
         for pid, doc_id in list(pending.items()):
-            detail = client.get(f"/api/documents/{doc_id}", headers=headers).json()
+            try:
+                detail = client.get(f"/api/documents/{doc_id}", headers=headers).json()
+            except (httpx.HTTPError, ValueError) as exc:
+                # An API restart must not end a run that may have taken an hour: the pages are
+                # still queued and finish without us. Ask again on the next round.
+                print(f"API not answering ({exc}); trying again", file=sys.stderr)
+                break
             if detail["status"] in ("completed", "failed") or detail["pages_by_status"]["failed"]:
                 page_ids[pid] = detail["pages"][0]["id"]
                 del pending[pid]
@@ -109,7 +115,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--api", default="http://127.0.0.1:8000")
     ap.add_argument("--pages", type=Path, default=HERE / "pages")
-    ap.add_argument("--timeout", type=float, default=3600.0)
+    ap.add_argument("--timeout", type=float, default=7200.0)
     ap.add_argument("--out", type=Path, default=HERE / "results" / "latest.json")
     args = ap.parse_args()
     if not (args.pages / "index.json").exists():

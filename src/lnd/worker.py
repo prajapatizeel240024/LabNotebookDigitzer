@@ -54,6 +54,13 @@ class Worker:
 
     def run(self) -> None:
         log.info("worker %s started", self.name)
+        # Compose starts workers once the model server is healthy, but Docker's restart policy
+        # (after a Docker or host restart) brings every container back at once. Jobs taken while
+        # the model is still loading would use up their attempts on 503s within seconds.
+        if not self.gateway.model_ready():
+            log.info("waiting for the model server to be ready")
+            while not self._stop and not self.gateway.model_ready():
+                time.sleep(2.0)
         idle = 0.02
         while not self._stop:
             self._reap()

@@ -111,6 +111,15 @@ class LLMGateway:
                     (prompt_tokens + completion_tokens, tenant),
                 )
 
+    # ---- readiness -------------------------------------------------------------------------
+    def model_ready(self) -> bool:
+        """True once the model server's health check answers 200 (llama-server answers 503
+        while it is still loading the model)."""
+        try:
+            return self._client.get(self.base_url + "/health", timeout=5).status_code == 200
+        except httpx.HTTPError:
+            return False
+
     # ---- the call --------------------------------------------------------------------------
     def chat(
         self,

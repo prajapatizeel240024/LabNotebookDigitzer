@@ -137,8 +137,9 @@ def test_no_masquerade_bridge_cannot_reach_the_internet(client):
         if out.decode().startswith("CONNECTED") and client.info()["OperatingSystem"] == (
             "Docker Desktop"
         ):
-            # Measured on Docker Desktop 29.8 (macOS): its VM's network still carries traffic
-            # from a bridge with masquerading off, so `edge` does not seal the API there.
+            # Measured on Docker Desktop 4.95 for Mac (Engine 29.8): its VM's network still
+            # carries traffic from a bridge with masquerading off, so `edge` does not seal the
+            # API there.
             pytest.xfail("Docker Desktop: a no-masquerade bridge still reaches the internet")
         assert out.decode().startswith("BLOCKED"), out
     finally:
